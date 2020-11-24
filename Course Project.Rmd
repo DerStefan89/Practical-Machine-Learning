@@ -1,0 +1,121 @@
+---
+title: "Course Project - Practical Machine Learning"
+author: "Stefan"
+date: "23 11 2020"
+output:
+  beamer_presentation: default
+  ioslides_presentation: default
+  slidy_presentation: default
+---
+
+
+## Installing packages
+```{r setup, include=FALSE}
+install.packages("caret")
+library(caret)
+library(knitr)
+install.packages("randomForest")
+library(randomForest)
+install.packages("corrplot")
+library(corrplot)
+library(rpart)
+install.packages("rattle")
+library(rattle)
+library(rpart.plot)
+install.packages("e1071", dep = TRUE)
+library(e1071)
+library(ggplot2)
+install.packages("cowplot")
+library(cowplot)
+library(randomForest)
+```
+
+
+## Loading the training data
+```{r cars, echo = TRUE}
+Train_url <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+Test_url  <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train_data <- read.csv(url(Train_url))
+test_data <- read.csv(url(Test_url))
+```
+
+## Splitting the training data for further analysis
+```{r pressure}
+SubGroups=createDataPartition(train_data$classe, p=0.7, list=FALSE)
+
+Training <- train_data[SubGroups, ]
+Testing <- train_data[-SubGroups, ]
+```
+
+## Removing Variables with near zero Variance
+Since some variables have a near zero variance, they are excluded for further analysis
+```{r cars, echo = TRUE}
+NZV <- nearZeroVar(Training)
+
+Trainset <- Training[ ,-NZV]
+Testset <- Testing[ ,-NZV]
+
+str(Trainset)
+```
+
+## Removing variables mostly NA
+Since some variables have many NAs, these variables are also excluded.
+```{r pressure}
+label <- apply(Trainset, 2, function(x) mean(is.na(x))) > 0.95
+Train <- Trainset[, -which(label, label == FALSE)]
+Test <- Testset[, -which(label, label == FALSE)]
+str(Train)
+```
+
+## Create correlation matrix and exclude high correlated variables
+Before the analysis we check the individual variables for multicollinearity. Variables with high multicolliniarity are excluded in order not to falsify the results
+```{r cars, echo = TRUE}
+cor.matrix_train <- cor(Train[sapply(Train, is.numeric)])
+
+cor_mat_train <- cor(cor.matrix_train[, -53])
+corrplot(cor_mat_train, order = "FPC", method = "color", type = "upper", 
+         tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+
+c <- findCorrelation(cor.matrix_train, cutoff = .90)
+Trainset_prefinal <- Train[,-c]
+```
+
+## Decission Tree
+The first analysis is performed using a decision tree.With the help of the Confusion Matrix, the prediction accuracy should be better illustrated
+```{r pressure}
+set.seed(123)
+DT_Model <- rpart(classe ~., data = Trainset_prefinal, method = "class")
+fancyRpartPlot(DT_Model)
+
+predictDT <- predict(DT_Model,Testset, type = "class")
+ConMatDT <- confusionMatrix(predictDT, Testset$classe)
+ConMatDT
+```
+Regarding the confusion Matrix, we get really good predictions with an Accurancy of 99 percent and and just a single missclassification
+
+
+## Random Forrest 
+Random Forrest is chosen as the second Modell, because although it is usually more difficult to interpret, it provides better predictions. The Confusion Matrix should also clarify the accuracy here
+```{r pressure}
+set.seed(123)
+RF <- randomForest(classe ~. , data= Trainset_prefinal, method="parRF")
+predict_RF <- predict(RF, Testset, type = "class")
+
+conMatRF <- confusionMatrix(predict_RF, Testset$classe)
+conMatRF
+```
+Looking at the confustion matrix, we can see that there is no misscalssification in the Random Forrest Modell with an Accurancy of 100 percent, which is exceptionally high.
+
+## Final Prediction 
+Since, as expected, the random forest model provides a better prediction than the decision tree, the final test set is predicted using the random forest model
+```{r pressure}
+RF_final <- predict(RF,test_data)
+RF_final
+```
+
+
+
+
+
+
